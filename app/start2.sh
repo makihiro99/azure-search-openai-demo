@@ -1,58 +1,49 @@
-#!/bin/sh
+#!/bin/bash
+set -e
 
-# cd into the parent directory of the script, 
-# so that the script generates virtual environments always in the same path.
+# cd into the parent directory of the script
 cd "${0%/*}" || exit 1
-
 cd ../
-echo 'Creating python virtual environment ".venv"'
-python3 -m venv .venv
 
+# 仮想環境がなければ作成
+if [ ! -d ".venv" ]; then
+    echo 'Creating python virtual environment ".venv"'
+    python3 -m venv .venv
+fi
+
+# Pythonパッケージのインストール
 echo ""
 echo "Restoring backend python packages"
 echo ""
 
+./.venv/bin/python -m pip install --upgrade pip
 ./.venv/bin/python -m pip install -r app/backend/requirements.txt
-out=$?
-if [ $out -ne 0 ]; then
-    echo "Failed to restore backend python packages"
-    exit $out
-fi
 
+# フロントエンドの依存関係インストール
 echo ""
 echo "Restoring frontend npm packages"
 echo ""
 
 cd app/frontend
 npm install
-out=$?
-if [ $out -ne 0 ]; then
-    echo "Failed to restore frontend npm packages"
-    exit $out
-fi
 
+# フロントエンドのビルド
 echo ""
 echo "Building frontend"
 echo ""
 
 npm run build
-out=$?
-if [ $out -ne 0 ]; then
-    echo "Failed to build frontend"
-    exit $out
-fi
+cd ../..
 
+# バックエンドの起動
 echo ""
 echo "Starting backend"
 echo ""
 
-cd ../backend
+cd app/backend
 
-port=50505
-host=localhost
-../../.venv/bin/python -m quart --app main:app run --port "$port" --host "$host" --reload
-out=$?
-if [ $out -ne 0 ]; then
-    echo "Failed to start backend"
-    exit $out
-fi
+# Azure App Service では PORT 環境変数を使用する
+PORT=${PORT:-8000}
+HOST=0.0.0.0
+
+../../.venv/bin/python -m quart --app main:app run --port "$PORT" --host "$HOST"
